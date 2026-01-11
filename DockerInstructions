@@ -1,0 +1,19 @@
+Install Docker
+
+Run the following commmands
+docker pull mcr.microsoft.com/mssql/server 
+  **downloads the SQL image
+docker run -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=StrongPassword1" -p 1433:1433 --name sqltest -d mcr.microsoft.com/mssql/server
+  **Creates a new image named sqltest
+  **Replace StrongPassword1 with your own strong password
+  **Runs on port 1433
+docker ps
+  **Shows if image is up and running
+
+At this point, the image is up and running with SQL
+Install SMSS to connect to the database using credentials used in your Docker run command.  
+  username:  sa
+  password:  what you replaced StrongPassword1 with
+  port:  1433
+  Host:  localhost
+
