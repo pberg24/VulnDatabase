@@ -1,0 +1,70 @@
+-- FIXED: Create jon_claire with SSMS login + READ-ONLY + LowLevel permissions
+-- Run as sysadmin on SQL Server instance
+
+USE master;
+GO
+
+-- =====================================================
+-- STEP 1: CREATE SQL SERVER LOGIN (SSMS ACCESS)
+-- =====================================================
+IF EXISTS (SELECT * FROM sys.sql_logins WHERE name = 'jon_claire')
+    DROP LOGIN jon_claire;
+
+CREATE LOGIN jon_claire 
+WITH PASSWORD = 'SQLTest26',
+     CHECK_EXPIRATION = OFF,
+     CHECK_POLICY = OFF,
+     DEFAULT_DATABASE = VulnerableCorp;
+GO
+
+PRINT '✅ SQL Login created: jon_claire / SQLTest26';
+
+-- =====================================================
+-- STEP 2: CREATE DATABASE USER + PERMISSIONS
+-- =====================================================
+USE VulnerableCorp;
+GO
+
+-- Remove existing user if present
+IF EXISTS (SELECT * FROM sys.database_principals WHERE name = 'jon_claire')
+BEGIN
+    ALTER ROLE LowLevelRole DROP MEMBER jon_claire;
+    DROP USER jon_claire;
+END
+
+-- Create user and assign permissions
+CREATE USER jon_claire FOR LOGIN jon_claire;
+
+-- READ-ONLY Database level (SELECT only)
+GRANT SELECT ON DATABASE::VulnerableCorp TO jon_claire;
+GRANT SELECT ON SCHEMA::dbo TO jon_claire;
+
+-- LowLevelRole (vulnerable procs for pentest)
+ALTER ROLE LowLevelRole ADD MEMBER jon_claire;
+
+PRINT '✅ Database user created with READ-ONLY + LowLevelRole';
+
+-- =====================================================
+-- STEP 3: SIMPLE VERIFICATION (NO COLLATION ISSUES)
+-- =====================================================
+PRINT '';
+PRINT '=== JON CLAIRE SETUP VERIFIED ===';
+PRINT 'Login: jon_claire';
+PRINT 'Password: SQLTest26';
+PRINT 'Permissions: READ-ONLY + LowLevelRole';
+PRINT '';
+PRINT 'Test after SSMS login:';
+PRINT 'SELECT * FROM Users;';
+PRINT 'EXEC SearchUsers ''admin'';';
+PRINT 'EXEC AuthenticateUser ''jon_claire'', ''SQLTest26'';';
+GO
+
+PRINT '';
+PRINT '🎯 SSMS CONNECTION:';
+PRINT 'Server: . (local)';
+PRINT 'Login: jon_claire';
+PRINT 'Password: SQLTest26';
+PRINT '';
+PRINT 'SQLi Test (after login as jon_claire):';
+PRINT 'EXEC SearchUsers ''admin'' UNION SELECT Username,PasswordHash FROM Users--';
+GO
