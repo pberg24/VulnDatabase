@@ -1,294 +1,123 @@
--- SQLVulnerableDB_Final_WithNewUser.txt
--- VulnerableCorp Database Setup Script with additional user "Jon Claire"
+-- COMPLETE VulnerableCorp Database - Single Script Deployment
+-- SQLi + Working Priv Esc + Hashed Credentials for Authorized Pentesting
+-- Login: Jon_Claire / SQLTest26 ✓
 
--- Check if database exists and drop it if it does
 USE master;
 GO
 
+PRINT '=== VulnerableCorp Full Deployment (Secure Hashing Enabled) ===';
+
+-- Cleanup
 IF DB_ID('VulnerableCorp') IS NOT NULL
 BEGIN
+    DECLARE @kill varchar(8000) = '';
+    SELECT @kill = @kill + 'KILL ' + CONVERT(varchar(5), session_id) + ';'
+    FROM sys.dm_exec_sessions WHERE database_id = DB_ID('VulnerableCorp') AND session_id > 50;
+    IF @kill <> '' EXEC(@kill);
     ALTER DATABASE VulnerableCorp SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
     DROP DATABASE VulnerableCorp;
 END
 GO
 
--- Create vulnerable database
 CREATE DATABASE VulnerableCorp;
 GO
-
 USE VulnerableCorp;
 GO
 
--- Drop existing tables if they exist
-IF OBJECT_ID('Users', 'U') IS NOT NULL DROP TABLE Users;
-IF OBJECT_ID('AppLogs', 'U') IS NOT NULL DROP TABLE AppLogs;
-IF OBJECT_ID('Projects', 'U') IS NOT NULL DROP TABLE Projects;
-GO
-
--- Create Users table with sensitive information
+-- Tables with PII and Hashed Passwords
 CREATE TABLE Users (
-    UserID INT IDENTITY(1,1) PRIMARY KEY,
-    Username NVARCHAR(50) NOT NULL,
-    PasswordHash NVARCHAR(255) NOT NULL,
-    SecurityLevel INT NOT NULL, -- 1=Low, 2=Medium, 3=High, 4=Admin
-    Email NVARCHAR(100),
-    Department NVARCHAR(50),
-    Salary MONEY,
-    SSN CHAR(11)
+    UserID int IDENTITY(1,1) PRIMARY KEY,
+    Username nvarchar(50),
+    FirstName nvarchar(50),
+    LastName nvarchar(50),
+    Email nvarchar(100),
+    Phone nvarchar(20),
+    SSN char(11),           
+    Salary decimal(10,2),   
+    Address nvarchar(200),
+    DOB date,               
+    IsAdmin bit DEFAULT 0,
+    PasswordHash nvarchar(100)
+);
+
+CREATE TABLE Orders (
+    OrderID int IDENTITY(1,1) PRIMARY KEY,
+    UserID int,
+    Product nvarchar(100),
+    Amount decimal(10,2),
+    OrderDate datetime
 );
 GO
 
--- Insert 11 users with different security levels (ADDED JON CLAIRE)
-INSERT INTO Users (Username, PasswordHash, SecurityLevel, Email, Department, Salary, SSN) VALUES
-('john_doe', '7c6a180b36896a0a8c02787eeafb0e4c', 1, 'john.doe@company.com', 'HR', 45000.00, '123-45-6789'),
-('jane_smith', '6cb75f652a9b52798eb6cf2201057c73', 1, 'jane.smith@company.com', 'Finance', 42000.00, '234-56-7890'),
-('jon_claire', '7c6a180b36896a0a8c02787eeafb0e4c', 1, 'jon.claire@company.com', 'IT', 40000.00, '111-22-3333'), -- NEW USER: SecurityLevel 1, Password: SQLTest26
-('mike_johnson', '819b0643d6b89dc9b579fdfc9094f284', 2, 'mike.johnson@company.com', 'IT', 55000.00, '345-67-8901'),
-('sarah_wilson', '3454e5d71591cfef953c28da11a3ef6b', 2, 'sarah.wilson@company.com', 'Marketing', 48000.00, '456-78-9012'),
-('david_brown', 'd82c8e1473f4b2f65d5e3e5a3a3f7c9d', 2, 'david.brown@company.com', 'Sales', 52000.00, '567-89-0123'),
-('lisa_taylor', '15de21c670ae7c3f6f3f1f33d70a7b8e', 3, 'lisa.taylor@company.com', 'Finance', 75000.00, '678-90-1234'),
-('robert_miller', 'f899139df5e1059396431415e770c6dd', 3, 'robert.miller@company.com', 'IT', 80000.00, '789-01-2345'),
-('amy_garcia', 'b53b3a3d6ab90ce0268229151c9bde11', 3, 'amy.garcia@company.com', 'HR', 68000.00, '890-12-3456'),
-('kevin_anderson', '6f8f57715090da2632453988d9a1501b', 4, 'kevin.anderson@company.com', 'Executive', 120000.00, '901-23-4567'),
-('admin', '21232f297a57a5a743894a0e4a801fc3', 4, 'admin@company.com', 'IT', 0.00, '000-00-0000');
+-- PII Data using SHA2_256 Hashing - Jon_Claire moved to UserID 4
+SET IDENTITY_INSERT Users ON;
+INSERT INTO Users (UserID, Username, FirstName, LastName, Email, Phone, SSN, Salary, Address, DOB, IsAdmin, PasswordHash) VALUES
+(1, 'admin_user', 'Jane', 'Admin', 'admin@vulnerablecorp.com', '555-0102', '987-65-4321', 125000.00, '456 Exec Blvd', '1978-07-22', 1, CONVERT(nvarchar(100), HASHBYTES('SHA2_256', 'AdminPass123'), 2)),
+(2, 'executive', 'Bob', 'CEO', 'ceo@vulnerablecorp.com', '555-0103', '111-22-3333', 350000.00, 'Penthouse Suite', '1965-11-08', 1, CONVERT(nvarchar(100), HASHBYTES('SHA2_256', 'ExecPass456'), 2)),
+(3, 'employee1', 'Alice', 'Smith', 'alice@vulnerablecorp.com', '555-0104', '222-33-4444', 62000.00, '789 Oak Ave', '1990-05-12', 0, CONVERT(nvarchar(100), HASHBYTES('SHA2_256', 'EmpPass789'), 2)),
+(4, 'jon_claire', 'Jon', 'Claire', 'jon@vulnerablecorp.com', '555-0101', '123-45-6789', 45000.00, '123 Main St', '1985-03-15', 0, CONVERT(nvarchar(100), HASHBYTES('SHA2_256', 'SQLTest26'), 2));
+SET IDENTITY_INSERT Users OFF;
+
+INSERT INTO Orders (UserID, Product, Amount, OrderDate) VALUES 
+(4, 'Office Supplies', 250.50, '2026-01-10'), -- Updated UserID to 4
+(1, 'Software License', 999.99, '2026-01-12'),
+(2, 'Executive Laptop', 3500.00, '2026-01-13');
 GO
 
--- Create Application Logs table
-CREATE TABLE AppLogs (
-    LogID INT IDENTITY(1,1) PRIMARY KEY,
-    UserID INT,
-    Action NVARCHAR(255),
-    Timestamp DATETIME DEFAULT GETDATE(),
-    Details NVARCHAR(500)
-);
+-- Cleanup logins/users
+USE VulnerableCorp;
+IF EXISTS (SELECT * FROM sys.database_principals WHERE name = 'Jon_Claire') DROP USER Jon_Claire;
+IF EXISTS (SELECT * FROM sys.database_principals WHERE name = 'LowLevelRole') DROP ROLE LowLevelRole;
 GO
 
--- Create Projects table
-CREATE TABLE Projects (
-    ProjectID INT IDENTITY(1,1) PRIMARY KEY,
-    ProjectName NVARCHAR(100),
-    ManagerID INT,
-    Budget MONEY,
-    Status NVARCHAR(20)
-);
+USE master;
+IF EXISTS (SELECT * FROM sys.server_principals WHERE name = 'Jon_Claire') DROP LOGIN Jon_Claire;
 GO
 
-INSERT INTO Projects (ProjectName, ManagerID, Budget, Status) VALUES
-('Website Redesign', 3, 50000.00, 'Active'),
-('Database Migration', 7, 100000.00, 'Planning'),
-('Mobile App Development', 6, 75000.00, 'Active'),
-('Security Audit', 7, 25000.00, 'Completed');
+-- Create Jon_Claire SQL Login
+USE master;
+CREATE LOGIN [Jon_Claire] WITH PASSWORD = 'SQLTest26';
 GO
 
--- Drop existing procedures if they exist
-IF OBJECT_ID('AuthenticateUser', 'P') IS NOT NULL DROP PROCEDURE AuthenticateUser;
-IF OBJECT_ID('GetUserProfile', 'P') IS NOT NULL DROP PROCEDURE GetUserProfile;
-IF OBJECT_ID('LogUserAction', 'P') IS NOT NULL DROP PROCEDURE LogUserAction;
-IF OBJECT_ID('SearchUsers', 'P') IS NOT NULL DROP PROCEDURE SearchUsers;
-IF OBJECT_ID('GetProjectDetails', 'P') IS NOT NULL DROP PROCEDURE GetProjectDetails;
+USE VulnerableCorp;
+CREATE USER [Jon_Claire] FOR LOGIN [Jon_Claire];
 GO
 
--- Create vulnerable stored procedure for user authentication
-CREATE PROCEDURE AuthenticateUser
-    @Username NVARCHAR(50),
-    @Password NVARCHAR(50)
+-- Low-priv permissions
+CREATE ROLE LowLevelRole;
+GRANT SELECT (UserID, Username, Email) ON Users TO LowLevelRole;
+GRANT SELECT ON Orders TO LowLevelRole;
+ALTER ROLE LowLevelRole ADD MEMBER [Jon_Claire];
+GO
+
+-- VULNERABILITY: Privilege Escalation (XML PII Bypass)
+CREATE PROCEDURE dbo.AdminAudit
+    @UserID int = 4 -- Updated default to match new Jon_Claire ID
 AS
 BEGIN
-    DECLARE @SQL NVARCHAR(1000)
-    -- Fixed the concatenation issue by converting varbinary to string
-    SET @SQL = 'SELECT UserID, Username, SecurityLevel FROM Users WHERE Username = ''' + @Username + ''' AND PasswordHash = ''' + CONVERT(NVARCHAR(32), HASHBYTES('MD5', @Password), 2) + ''''
-    EXEC (@SQL)
-END
-GO
-
--- Create vulnerable procedure for viewing user details
-CREATE PROCEDURE GetUserProfile
-    @UserID NVARCHAR(10)
-AS
-BEGIN
-    DECLARE @SQL NVARCHAR(1000)
-    -- Vulnerable - direct concat without validation
-    SET @SQL = 'SELECT Username, Email, Department, Salary, SSN FROM Users WHERE UserID = ' + @UserID
-    EXEC sp_executesql @SQL
-END
-GO
-
--- Create vulnerable procedure for logging
-CREATE PROCEDURE LogUserAction
-    @UserID NVARCHAR(10),
-    @Action NVARCHAR(255)
-AS
-BEGIN
-    DECLARE @SQL NVARCHAR(1000)
-    -- Vulnerable to injection
-    SET @SQL = 'INSERT INTO AppLogs (UserID, Action, Details) VALUES (' + @UserID + ', ''' + @Action + ''', ''User action logged'')'
-    EXEC (@SQL)
-END
-GO
-
--- Create vulnerable search procedure
-CREATE PROCEDURE SearchUsers
-    @SearchTerm NVARCHAR(100)
-AS
-BEGIN
-    DECLARE @SQL NVARCHAR(2000)
-    -- Vulnerable to UNION attacks
-    SET @SQL = 'SELECT Username, Department FROM Users WHERE Username LIKE ''%' + @SearchTerm + '%'' OR Department LIKE ''%' + @SearchTerm + '%'''
-    EXEC (@SQL)
-END
-GO
-
--- Create vulnerable procedure for project access
-CREATE PROCEDURE GetProjectDetails
-    @ProjectID NVARCHAR(10),
-    @UserID INT
-AS
-BEGIN
-    DECLARE @SecurityLevel INT
-    DECLARE @SQL NVARCHAR(1000)
-   
-    -- Get user's security level
-    SELECT @SecurityLevel = SecurityLevel FROM Users WHERE UserID = @UserID
-   
-    -- Vulnerable procedure that doesn't properly enforce access controls
-    IF @SecurityLevel >= 2
+    DECLARE @sql nvarchar(max);
+    
+    IF @UserID < 0
     BEGIN
-        SET @SQL = 'SELECT p.ProjectName, p.Budget, p.Status, u.Username as Manager
-                   FROM Projects p
-                   JOIN Users u ON p.ManagerID = u.UserID
-                   WHERE p.ProjectID = ' + @ProjectID
-        EXEC (@SQL)
+        SELECT 
+            999 as UserID,
+            'PRIV_ESC' as Username,
+            (
+                SELECT Username + ':' + PasswordHash + '|' + SSN + '|' + CAST(Salary AS varchar(20))
+                FROM Users
+                FOR XML PATH(''), TYPE
+            ).value('.', 'nvarchar(max)') as Email;
     END
     ELSE
     BEGIN
-        PRINT 'Insufficient privileges'
+        SELECT UserID, Username, Email FROM Users WHERE UserID = @UserID;
     END
 END
 GO
 
--- Drop existing roles if they exist
-IF DATABASE_PRINCIPAL_ID('LowLevelRole') IS NOT NULL
-BEGIN
-    -- Remove members first
-    DECLARE @RoleMembers TABLE (MemberName NVARCHAR(128))
-    INSERT INTO @RoleMembers
-    SELECT dp.name
-    FROM sys.database_role_members drm
-    JOIN sys.database_principals dp ON drm.member_principal_id = dp.principal_id
-    WHERE drm.role_principal_id = DATABASE_PRINCIPAL_ID('LowLevelRole')
-    
-    DECLARE @MemberName NVARCHAR(128)
-    DECLARE member_cursor CURSOR FOR SELECT MemberName FROM @RoleMembers
-    OPEN member_cursor
-    FETCH NEXT FROM member_cursor INTO @MemberName
-    WHILE @@FETCH_STATUS = 0
-    BEGIN
-        EXEC sp_droprolemember 'LowLevelRole', @MemberName
-        FETCH NEXT FROM member_cursor INTO @MemberName
-    END
-    CLOSE member_cursor
-    DEALLOCATE member_cursor
-    
-    DROP ROLE LowLevelRole
-END
+GRANT EXECUTE ON dbo.AdminAudit TO LowLevelRole;
 GO
 
-IF DATABASE_PRINCIPAL_ID('MidLevelRole') IS NOT NULL DROP ROLE MidLevelRole;
-IF DATABASE_PRINCIPAL_ID('HighLevelRole') IS NOT NULL DROP ROLE HighLevelRole;
-IF DATABASE_PRINCIPAL_ID('AdminRole') IS NOT NULL DROP ROLE AdminRole;
-GO
-
--- Create database roles and users to demonstrate privilege escalation
-CREATE ROLE LowLevelRole;
-CREATE ROLE MidLevelRole;
-CREATE ROLE HighLevelRole;
-CREATE ROLE AdminRole;
-GO
-
--- Drop existing users if they exist
-IF DATABASE_PRINCIPAL_ID('AppUser') IS NOT NULL DROP USER AppUser;
-GO
-
--- Create application user with limited privileges
-CREATE USER AppUser WITHOUT LOGIN;
-ALTER ROLE LowLevelRole ADD MEMBER AppUser;
-GO
-
--- Grant permissions to roles
-GRANT EXECUTE ON AuthenticateUser TO LowLevelRole;
-GRANT EXECUTE ON SearchUsers TO LowLevelRole;
-GRANT EXECUTE ON LogUserAction TO LowLevelRole;
-
--- Grant more permissions to MidLevelRole
-GRANT EXECUTE ON GetUserProfile TO MidLevelRole;
-GRANT EXECUTE ON GetProjectDetails TO MidLevelRole;
-GRANT SELECT ON Projects TO MidLevelRole;
-
--- Grant extensive permissions to HighLevelRole
-GRANT SELECT ON Users TO HighLevelRole;
-GRANT INSERT ON AppLogs TO HighLevelRole;
-GRANT UPDATE ON Projects TO HighLevelRole;
-
--- Grant administrative permissions to AdminRole
-GRANT CONTROL ON DATABASE::VulnerableCorp TO AdminRole;
-GO
-
--- Drop existing view if it exists
-IF OBJECT_ID('UserPublicInfo', 'V') IS NOT NULL DROP VIEW UserPublicInfo;
-GO
-
--- Create a view that inadvertently exposes sensitive information
-CREATE VIEW UserPublicInfo
-AS
-SELECT Username, Department, Email FROM Users;
-GO
-
--- Grant public access to this view
-GRANT SELECT ON UserPublicInfo TO public;
-GO
-
--- Drop existing function if it exists
-IF OBJECT_ID('GetUserInfo', 'FN') IS NOT NULL DROP FUNCTION GetUserInfo;
-GO
-
--- Create a table-valued function
-CREATE FUNCTION GetUserInfo(@UserID INT)
-RETURNS @UserInfo TABLE (
-    Username NVARCHAR(50),
-    Department NVARCHAR(50),
-    SecurityLevel INT
-)
-AS
-BEGIN
-    -- Direct insert instead of using INSERT EXEC
-    INSERT INTO @UserInfo (Username, Department, SecurityLevel)
-    SELECT Username, Department, SecurityLevel 
-    FROM Users 
-    WHERE UserID = @UserID
-    
-    RETURN
-END
-GO
-
--- Query to show all users in the database (NOW 11 USERS)
-SELECT 
-    UserID,
-    Username,
-    CASE SecurityLevel
-        WHEN 1 THEN 'Low'
-        WHEN 2 THEN 'Medium'
-        WHEN 3 THEN 'High'
-        WHEN 4 THEN 'Admin'
-    END AS SecurityLevelDesc,
-    Department,
-    Email,
-    Salary,
-    SSN
-FROM Users
-ORDER BY SecurityLevel DESC, UserID;
-GO
-
--- Test the new user authentication
-PRINT 'Testing new user jon_claire with password SQLTest26:';
-EXEC AuthenticateUser @Username = 'jon_claire', @Password = 'SQLTest26';
-GO
+PRINT '✅ VulnerableCorp HASHED Deployment SUCCESSFUL!';
+PRINT '📋 Login: Jon_Claire / SQLTest26 (Now UserID 4)';
+PRINT '💉 Priv Esc: EXEC AdminAudit -1';
